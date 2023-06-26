@@ -9,25 +9,20 @@ cap.set(4, 420)
 catFaceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface.xml")
 catFaceCascadeExtended = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface_extended.xml")
 
-'''
-    # if you want to detect any object for example eyes, use one more layer of classifier as below:
-    eyeCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye_tree_eyeglasses.xml")
-'''
-
 while True:
     success, img = cap.read()
     imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # Getting corners around the face
-    faces = catFaceCascade.detectMultiScale(imgGray, scaleFactor=1.05, minNeighbors=6, minSize=(30,30))  # 1.3 = scale factor, 5 = minimum neighbor
     facesExt = catFaceCascadeExtended.detectMultiScale(imgGray, scaleFactor=1.05, minNeighbors=6, minSize=(30,30))
-    # drawing bounding box around face
     for (x, y, w, h) in facesExt:
-        img = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-        cv2.putText(img, 'Cat', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        print()
+        imgGray = cv2.rectangle(imgGray, (x, y), (x + w, y + h), (0, 255, 0), 3)
+        cv2.putText(imgGray, 'Cat', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-    cv2.imshow('cat_detect', img)
+    cv2.imshow('cat_detect', imgGray)
     if cv2.waitKey(10) & 0xFF == ord('q'):
         break
 cap.release()
 cv2.destroyWindow('cat_detect')
+
+# TODO: learn difference between cats in greyscale, adjust detection, look into ordering parts
