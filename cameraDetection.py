@@ -1,29 +1,41 @@
-import tensorflow as tf
 import cv2
 
-catFace = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface.xml")
-vid = cv2.VideoCapture(0)
+# Enable camera
+cap = cv2.VideoCapture(0)
+cap.set(3, 640)
+cap.set(4, 420)
 
-while(True):
-      
-    # Capture the video frame
-    # by frame
-    ret, frame = vid.read()
+# import cascade file for facial recognition
+catFaceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface.xml")
+catFaceCascadeExtended = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface_extended.xml")
+
+'''
+    # if you want to detect any object for example eyes, use one more layer of classifier as below:
+    eyeCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye_tree_eyeglasses.xml")
+'''
+
+while True:
+    success, img = cap.read()
     imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = faceCascade.detectMultiScale(imgGray, 1.3, 5)  
-    for (x, y, w, h) in faces:
-        img = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255,   0), 3)
-  
-    # Display the resulting frame
-    cv2.imshow('face_detect', frame)
-      
-    # the 'q' button is set as the
-    # quitting button you may use any
-    # desired button of your choice
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+
+    # Getting corners around the face
+    faces = catFaceCascade.detectMultiScale(imgGray, scaleFactor=1.05, minNeighbors=6, minSize=(30,30))  # 1.3 = scale factor, 5 = minimum neighbor
+    facesExt = catFaceCascadeExtended.detectMultiScale(imgGray, scaleFactor=1.05, minNeighbors=6, minSize=(30,30))
+    # drawing bounding box around face
+    for (x, y, w, h) in facesExt:
+        img = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
+
+
+    '''
+    # detecting eyes
+    eyes = eyeCascade.detectMultiScale(imgGray)
+    # drawing bounding box for eyes
+    for (ex, ey, ew, eh) in eyes:
+        img = cv2.rectangle(img, (ex, ey), (ex+ew, ey+eh), (255, 0, 0), 3)
+    '''
+
+    cv2.imshow('cat_detect', img)
+    if cv2.waitKey(10) & 0xFF == ord('q'):
         break
-  
-# After the loop release the cap object
-vid.release()
-# Destroy all the windows
-cv2.destroyAllWindows()
+cap.release()
+cv2.destroyWindow('cat_detect')
