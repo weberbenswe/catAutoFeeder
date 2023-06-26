@@ -24,15 +24,7 @@ while True:
     # drawing bounding box around face
     for (x, y, w, h) in facesExt:
         img = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-
-
-    '''
-    # detecting eyes
-    eyes = eyeCascade.detectMultiScale(imgGray)
-    # drawing bounding box for eyes
-    for (ex, ey, ew, eh) in eyes:
-        img = cv2.rectangle(img, (ex, ey), (ex+ew, ey+eh), (255, 0, 0), 3)
-    '''
+        cv2.putText(img, 'Cat', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
     cv2.imshow('cat_detect', img)
     if cv2.waitKey(10) & 0xFF == ord('q'):
