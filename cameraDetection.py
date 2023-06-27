@@ -7,51 +7,88 @@ cap.set(3, 640)
 cap.set(4, 420)
 
 # Color detection parameters
-""" lower_black = np.array([0], dtype=np.uint8)  # Lower grayscale value for black
-upper_black = np.array([60], dtype=np.uint8)  # Upper grayscale value for black (dark gray)
+lower_black = 0
+upper_black = 64
 
-lower_white = np.array([160], dtype=np.uint8)  # Lower grayscale value for white (including gray)
-upper_white = np.array([255], dtype=np.uint8)  # Upper grayscale value for white """
+# Object motion parameters
+previous_frame = None
+motion_threshold = 12000 # more movement required
 
-lower_black = np.array([0, 0, 0], dtype=np.uint8)  # Lower BGR value for black
-upper_black = np.array([60, 60, 60], dtype=np.uint8)  # Upper BGR value for black (dark gray)
-
-lower_white = np.array([160, 160, 160], dtype=np.uint8)  # Lower BGR value for white (including gray)
-upper_white = np.array([255, 255, 255], dtype=np.uint8)  # Upper BGR value for white
+# Object size parameters
+previous_object_size = 0
+size_change_threshold = 5 # object needs to be growing faster
 
 # import cascade file for facial recognition
 # https://github.com/opencv/opencv/tree/master/data/haarcascades
-catFaceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface.xml")
-catFaceCascadeExtended = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface_extended.xml")
+# catFaceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface.xml")
+# catFaceCascadeExtended = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalcatface_extended.xml")
 
 while True:
     success, img = cap.read()
-    # imgGrey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    imgGrey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    facesExt = catFaceCascade.detectMultiScale(img, scaleFactor=1.5, minNeighbors=2)
-    facesExt2 = catFaceCascadeExtended.detectMultiScale(img, scaleFactor=1.5, minNeighbors=2)
-    combined_faces = np.concatenate((facesExt, facesExt2), axis=0)
+    mask = cv2.inRange(imgGrey, lower_black, upper_black)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    mask = cv2.erode(mask, kernel, iterations=1)
+    mask = cv2.dilate(mask, kernel, iterations=1)
 
-    for (x, y, w, h) in combined_faces:
-        roi = img[y:y + h, x:x + w]  # Region of interest
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    min_contour_area = 75 # lower == smaller detected objects
+    min_perimeter_ratio = 4 # higher number restricts more roundness
 
-         # Detect black color
-        mask_black = cv2.inRange(roi, lower_black, upper_black)
-        contours_black, _ = cv2.findContours(mask_black, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Check if the subject is black
-        if len(contours_black) > 0:
-            cv2.drawContours(img, contours_black, -1, (0, 0, 0), 2)
-            cv2.putText(img, 'Tater', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 2)
-        else:
-            # Detect white color
-            mask_white = cv2.inRange(roi, lower_white, upper_white)
-            contours_white, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            cv2.drawContours(img, contours_white, -1, (255, 255, 255), 2)
-            cv2.putText(img, 'Pee', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+    for contour in contours:
+        confidence = 0
+        result = ''
 
-        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-        cv2.putText(img, 'Cat', (x, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        # Must meet min size threshold
+        if cv2.contourArea(contour) > min_contour_area:
+            confidence += 1
+
+            # Object is black
+            perimeter = cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, 0.04 * perimeter, True)
+            x, y, w, h = cv2.boundingRect(approx)
+            confidence+=1
+            result += 'COLOR '
+
+            # Object shape detection *
+            contour_area = cv2.contourArea(contour)
+            contour_perimeter = perimeter
+            perimeter_ratio = contour_perimeter / (2 * np.sqrt(contour_area / np.pi))
+
+            if perimeter_ratio > min_perimeter_ratio:
+                # print('ratio', perimeter_ratio)
+                confidence += 1
+                result += 'SHAPE '
+
+            # Object motion detection * 
+            current_frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            if previous_frame is not None:
+                
+                frame_diff = cv2.absdiff(current_frame, previous_frame)
+                motion = np.sum(frame_diff > 30)
+
+                if motion > motion_threshold:
+                    # print('motion', motion)
+                    confidence+=1
+                    result+='MOVING '
+                    
+                # Object size change detection * 
+                current_object_size = w * h
+                if previous_object_size != 0:
+                    size_change = abs(current_object_size - previous_object_size) / previous_object_size
+                    if size_change > size_change_threshold:
+                        print('Size', size_change)
+                        confidence+=1
+                        result+='GROWING '
+                    
+                previous_object_size = current_object_size
+            previous_frame = current_frame.copy()
+
+        if confidence > 0:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
+            cv2.putText(img, str(result), (x, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
     cv2.imshow('cat_detect', img)
     if cv2.waitKey(10) & 0xFF == ord('q'):
